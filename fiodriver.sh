@@ -6,7 +6,7 @@
 # that holds it — no raw block-device I/O, no blkdiscard.
 TESTFILES=( "./fio_testfile.dat" )
 THREADS=1
-IODEPTH=( 1 4 16 32 64 )
+IODEPTH=( 1 8 32 )
 FIO_SCRIPTS='scripts'
 # Per-job file size passed through to the .fio jobs.
 SIZE="${SIZE:-1G}"
