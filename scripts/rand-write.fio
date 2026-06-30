@@ -3,7 +3,7 @@ rw=randwrite
 size=${SIZE}
 bs=${BLOCK_SIZE}
 direct=1
-filename=/dev/${DEVICE}
+filename=${TESTFILE}
 iodepth=${IODEPTH}
 ioengine=libaio
 time_based

@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv, argparse
 
-matplotlib.use('Agg')
-
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', dest="files", type=str, nargs='+', required=True, help='The out.txt files')
 parser.add_argument('-l', dest="labels", type=str, nargs='+', required=True, help='Label for each curve')
@@ -21,14 +19,9 @@ parser.add_argument('-n', dest="name", required=True, help="Name of output plot"
 parser.add_argument('-t', dest="title", required=True, help="Title of output plot")
 args = parser.parse_args()
 
-scale = None
+scale = args.scale
 
-if args.scale is not None:
-    scale = args.scale
-
-index = 0
-
-for f in args.files:
+for index, f in enumerate(args.files):
     with open(f, 'r') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
         header = next(reader, None)
@@ -61,8 +54,6 @@ for f in args.files:
             plt.plot(x2, y, label=args.labels[index])
 
         plt.xticks(x2, x, rotation=90)
-
-        index += 1
 
 plt.xlabel(args.xlabel)
 plt.ylabel(args.ylabel)

@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 
-DEVICES=( sdb )
+# File-based, non-destructive benchmark driver.
+# Each entry is a regular file path that fio will read/write.
+# The file is created on first use by fio inside the mounted filesystem
+# that holds it — no raw block-device I/O, no blkdiscard.
+TESTFILES=( "./fio_testfile.dat" )
 THREADS=1
 IODEPTH=( 1 4 16 32 64 )
 FIO_SCRIPTS='scripts'
+# Per-job file size passed through to the .fio jobs.
+SIZE="${SIZE:-1G}"
 
 function usage() {
         echo
@@ -13,6 +19,9 @@ function usage() {
         echo "Options:"
         echo "      -o   Output directory"
         echo "      -h   Show usage"
+        echo
+        echo "Edit TESTFILES at the top of this script to point at the path(s)"
+        echo "you want fio to read/write. Default: ./fio_testfile.dat"
         echo
 
         exit 1
@@ -47,20 +56,30 @@ mkdir "$OUTPUT"
 
 STARTTIME=$(date +%s)
 
-for DEVICE in ${DEVICES[@]}; do
+for TESTFILE in "${TESTFILES[@]}"; do
+	# Label used in output dir names and plot titles. Derived from the
+	# test-file basename so plotall.sh can still find the per-run dirs.
+	LABEL=$(basename "$TESTFILE")
+	LABEL="${LABEL%.*}"
+
 	for IOD in ${IODEPTH[@]}; do
 		# RANDOM WRITES
-		./runfio.sh -d "$DEVICE" -n "$THREADS" -i "$IOD" -f "${FIO_SCRIPTS}/rand-write.fio" -o "${OUTPUT}/rand_w_${DEVICE}_${IOD}iodepth_${THREADS}threads"
+		SIZE="$SIZE" ./runfio.sh -t "$TESTFILE" -n "$THREADS" -i "$IOD" -f "${FIO_SCRIPTS}/rand-write.fio" -o "${OUTPUT}/rand_w_${LABEL}_${IOD}iodepth_${THREADS}threads"
 		# RANDOM READS
-		./runfio.sh -d "$DEVICE" -n "$THREADS" -i "$IOD" -f "${FIO_SCRIPTS}/rand-read.fio"  -o "${OUTPUT}/rand_r_${DEVICE}_${IOD}iodepth_${THREADS}threads"
+		SIZE="$SIZE" ./runfio.sh -t "$TESTFILE" -n "$THREADS" -i "$IOD" -f "${FIO_SCRIPTS}/rand-read.fio"  -o "${OUTPUT}/rand_r_${LABEL}_${IOD}iodepth_${THREADS}threads"
 
 		# SEQUENTIAL WRITES
-		./runfio.sh -d "$DEVICE" -n 1 -i "$IOD" -f "${FIO_SCRIPTS}/write.fio" -o "${OUTPUT}/seq_w_${DEVICE}_${IOD}iodepth"
+		SIZE="$SIZE" ./runfio.sh -t "$TESTFILE" -n 1 -i "$IOD" -f "${FIO_SCRIPTS}/write.fio" -o "${OUTPUT}/seq_w_${LABEL}_${IOD}iodepth"
 		# SEQUENTIAL READS
-		./runfio.sh -d "$DEVICE" -n 1 -i "$IOD" -f "${FIO_SCRIPTS}/read.fio"  -o "${OUTPUT}/seq_r_${DEVICE}_${IOD}iodepth"
+		SIZE="$SIZE" ./runfio.sh -t "$TESTFILE" -n 1 -i "$IOD" -f "${FIO_SCRIPTS}/read.fio"  -o "${OUTPUT}/seq_r_${LABEL}_${IOD}iodepth"
 	done
 	# Generate plots
-	./plotall.sh "$OUTPUT" "$DEVICE" "$THREADS" "${IODEPTH[@]}"
+	./plotall.sh "$OUTPUT" "$LABEL" "$THREADS" "${IODEPTH[@]}"
+
+	# Clean up the test file fio created.
+	if [ -f "$TESTFILE" ]; then
+		rm -f "$TESTFILE"
+	fi
 done
 
 ENDTIME=$(date +%s)
