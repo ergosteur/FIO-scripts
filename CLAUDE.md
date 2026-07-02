@@ -33,10 +33,28 @@ plotfio.py          one CSV-set → one EPS
 `runfio.sh`. Adding a new workload means adding a `.fio` here and wiring it
 into `fiodriver.sh`'s per-iodepth block.
 
+There is a second, standalone driver for sustained writes:
+
+```
+runsustained.sh    single-pass write of a large file (SIZE, default 100G)
+  ↓ runs fio        via scripts/sustained-write.fio — NOT time_based, so it
+  ↓                 writes SIZE once through, exceeding the SLC cache
+  ↓                 (${TESTFILE}, ${SIZE}, ${BLOCK_SIZE}, ${IODEPTH}, ${BW_LOG})
+                    → fio.out + per-second throughput_over_time.csv
+```
+
+Its point is to expose the post-SLC-cache write "cliff" that the 20-second
+`time_based` jobs in the matrix can never reach. It does not go through
+`parser.sh`/`plotall.sh`; it reduces fio's `write_bw_log` to a time/MB-s CSV
+itself.
+
 ## Output-directory naming contract
 
-`fiodriver.sh` writes results to `<output-dir>/<YYYY-MM-DD_HH:MM>/` with
-per-run subdirectories whose names are load-bearing:
+`fiodriver.sh` writes results to `results/<drive>/<YYYY-MM-DD_HH:MM>/` with
+per-run subdirectories whose names are load-bearing. `<drive>` comes from
+`-o`, or is auto-derived from the disk backing the first `TESTFILE` by
+`helpers/drivename.sh` (override the `results/` root with `RESULTS_ROOT`).
+`results/` is gitignored — benchmark output is never committed.
 
 ```
 rand_w_<LABEL>_<IOD>iodepth_<THREADS>threads/
@@ -56,8 +74,8 @@ The suite was refactored from raw-block-device targeting to file-based I/O
 on branch `safe-file-based-fio`. The destructive paths must stay removed:
 
 - `scripts/*.fio` use `filename=${TESTFILE}` — never `/dev/${DEVICE}`.
-- `runfio.sh` does not call `blkdiscard` and does not need `sudo`.
-- `runfio.sh`'s `-t` flag rejects any path under `/dev/`.
+- `runfio.sh` and `runsustained.sh` do not call `blkdiscard` and don't need `sudo`.
+- Both drivers' `-t` flag rejects any path under `/dev/`.
 
 Keep `direct=1` in the .fio jobs so numbers reflect the device, not the
 page cache.
@@ -76,7 +94,14 @@ page cache.
 
 Full sweep (edit `TESTFILES` in `fiodriver.sh` first):
 ```bash
-./fiodriver.sh -o <output-dir>
+./fiodriver.sh              # -> results/<auto-drive-name>/<timestamp>/
+./fiodriver.sh -o MyDrive   # -> results/MyDrive/<timestamp>/
+```
+
+Sustained write past the SLC cache (single-pass, per-second bandwidth log).
+Set `SIZE` above the drive's cache and below its free space:
+```bash
+SIZE=200G ./runsustained.sh -t ./fio_testfile.dat -o MyDrive
 ```
 
 Single workload + iodepth (file size override via `SIZE`, default 1G):
@@ -87,7 +112,7 @@ SIZE=1G ./runfio.sh -t ./fio_testfile.dat -n 1 -i 32 \
 
 Re-plot an existing run without re-benchmarking:
 ```bash
-./plotall.sh <output-dir>/<timestamp> <LABEL> <THREADS> <IOD1> <IOD2> ...
+./plotall.sh results/<drive>/<timestamp> <LABEL> <THREADS> <IOD1> <IOD2> ...
 ```
 
 Syntax-check the shell scripts:

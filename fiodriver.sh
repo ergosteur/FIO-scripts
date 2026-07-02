@@ -10,6 +10,11 @@ IODEPTH=( 1 8 32 )
 FIO_SCRIPTS='scripts'
 # Per-job file size passed through to the .fio jobs.
 SIZE="${SIZE:-1G}"
+# Results land under results/<drive>/<timestamp>/ (gitignored). The drive
+# name comes from -o, or is auto-derived from the disk backing the first
+# TESTFILE. Override the root with RESULTS_ROOT.
+RESULTS_ROOT="${RESULTS_ROOT:-results}"
+source "$(dirname "$0")/helpers/drivename.sh"
 
 function usage() {
         echo
@@ -17,11 +22,14 @@ function usage() {
         echo "      fiodriver.sh -o <output-dir> [-h]"
         echo
         echo "Options:"
-        echo "      -o   Output directory"
+        echo "      -o   Drive name / label. Results go to results/<name>/<timestamp>."
+        echo "           Omit to auto-derive the name from the disk backing the test file."
         echo "      -h   Show usage"
         echo
         echo "Edit TESTFILES at the top of this script to point at the path(s)"
         echo "you want fio to read/write. Default: ./fio_testfile.dat"
+        echo
+        echo "Override the results root with the RESULTS_ROOT env var (default: results)."
         echo
 
         exit 1
@@ -31,10 +39,7 @@ while getopts ":o:h" opt
 do
         case $opt in
 		o)
-			if [ ! -d "$OPTARG" ]; then
-				mkdir "$OPTARG"
-			fi
-			DIRECTORY="$OPTARG";;
+			DRIVE="$OPTARG";;
                 \?)
                         echo "ERROR: Invalid option: -$OPTARG" >&2; usage;;
                 :)
@@ -44,15 +49,14 @@ do
         esac
 done
 
-if [ -z $DIRECTORY ]; then
-        echo "ERROR: Output directory not specified" >&2
-        usage
+if [ -z "${DRIVE:-}" ]; then
+        DRIVE=$(derive_drive_name "${TESTFILES[0]}")
 fi
 
 DATE=$(date "+%F_%R")
-OUTPUT="${DIRECTORY}/${DATE}"
+OUTPUT="${RESULTS_ROOT}/${DRIVE}/${DATE}"
 
-mkdir "$OUTPUT"
+mkdir -p "$OUTPUT"
 
 STARTTIME=$(date +%s)
 

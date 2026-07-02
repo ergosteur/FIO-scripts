@@ -1,0 +1,6 @@
+# Benchmark results are large, machine-specific, and regenerated per run.
+results/
+
+# Transient fio test files (normally cleaned up by the drivers, but a
+# crashed run can leave one behind).
+fio_testfile*.dat

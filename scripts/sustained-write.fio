@@ -1,0 +1,23 @@
+# Single-pass sustained sequential write.
+#
+# Unlike write.fio this job is NOT time_based: it writes ${SIZE} once,
+# straight through, so the volume written exceeds the drive's pseudo-SLC
+# write cache and throughput settles to the true NAND write speed. Per-
+# second bandwidth is logged to ${BW_LOG}_bw.1.log so throughput-over-time
+# (the SLC "cliff") can be plotted.
+#
+# All fields are populated from the environment by runsustained.sh.
+[sustained-write]
+rw=write
+size=${SIZE}
+bs=${BLOCK_SIZE}
+direct=1
+filename=${TESTFILE}
+iodepth=${IODEPTH}
+ioengine=libaio
+numjobs=1
+thread
+end_fsync=1
+group_reporting
+write_bw_log=${BW_LOG}
+log_avg_msec=1000
